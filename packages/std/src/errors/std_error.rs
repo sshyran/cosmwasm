@@ -1,6 +1,8 @@
 #![allow(deprecated)]
 
-use snafu::Snafu;
+#[cfg(feature = "backtraces")]
+use std::backtrace::Backtrace;
+use thiserror::Error;
 
 /// Structured error type for init, handle and query.
 ///
@@ -17,105 +19,126 @@ use snafu::Snafu;
 /// Checklist for adding a new error:
 /// - Add enum case
 /// - Add creator function in std_error_helpers.rs
-#[derive(Debug, Snafu)]
-#[non_exhaustive]
+#[derive(Error, Debug)]
 pub enum StdError {
     /// Whenever there is no specific error type available
-    #[snafu(display("Generic error: {}", msg))]
+    #[error("Generic error: {msg}")]
     GenericErr {
         msg: String,
-        backtrace: Option<snafu::Backtrace>,
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
     },
-    #[snafu(display("Invalid Base64 string: {}", msg))]
+    #[error("Invalid Base64 string: {msg}")]
     InvalidBase64 {
         msg: String,
-        backtrace: Option<snafu::Backtrace>,
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
     },
     /// Whenever UTF-8 bytes cannot be decoded into a unicode string, e.g. in String::from_utf8 or str::from_utf8.
-    #[snafu(display("Cannot decode UTF8 bytes into string: {}", msg))]
+    #[error("Cannot decode UTF8 bytes into string: {msg}")]
     InvalidUtf8 {
         msg: String,
-        backtrace: Option<snafu::Backtrace>,
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
     },
-    #[snafu(display("{} not found", kind))]
+    #[error("{kind} not found")]
     NotFound {
         kind: String,
-        backtrace: Option<snafu::Backtrace>,
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
     },
-    #[snafu(display("Error parsing into type {}: {}", target, msg))]
+    #[error("Error parsing into type {target_type}: {msg}")]
     ParseErr {
         /// the target type that was attempted
-        target: String,
+        target_type: String,
         msg: String,
-        backtrace: Option<snafu::Backtrace>,
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
     },
-    #[snafu(display("Error serializing type {}: {}", source, msg))]
+    #[error("Error serializing type {source_type}: {msg}")]
     SerializeErr {
         /// the source type that was attempted
-        #[snafu(source(false))]
-        source: String,
+        source_type: String,
         msg: String,
-        backtrace: Option<snafu::Backtrace>,
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
     },
-    #[snafu(display("Unauthorized"))]
     #[deprecated(
         since = "0.11.0",
         note = "All StdError cases not required by the standard library will be removed in cosmwasm-std 0.12. Please migrate to custom errors instead of using StdError."
     )]
-    Unauthorized { backtrace: Option<snafu::Backtrace> },
-    #[snafu(display("Cannot subtract {} from {}", subtrahend, minuend))]
+    #[error("Unauthorized")]
+    Unauthorized {
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
+    },
+    #[error("Cannot subtract {subtrahend} from {minuend}")]
     Underflow {
         minuend: String,
         subtrahend: String,
-        backtrace: Option<snafu::Backtrace>,
+        #[cfg(feature = "backtraces")]
+        backtrace: Backtrace,
     },
 }
 
 impl StdError {
     pub fn generic_err<S: Into<String>>(msg: S) -> Self {
-        GenericErr { msg: msg.into() }.build()
+        StdError::GenericErr {
+            msg: msg.into(),
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
+        }
     }
 
     pub fn invalid_base64<S: ToString>(msg: S) -> Self {
-        InvalidBase64 {
+        StdError::InvalidBase64 {
             msg: msg.to_string(),
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
         }
-        .build()
     }
 
     pub fn invalid_utf8<S: ToString>(msg: S) -> Self {
-        InvalidUtf8 {
+        StdError::InvalidUtf8 {
             msg: msg.to_string(),
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
         }
-        .build()
     }
 
     pub fn not_found<S: Into<String>>(kind: S) -> Self {
-        NotFound { kind: kind.into() }.build()
+        StdError::NotFound {
+            kind: kind.into(),
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
+        }
     }
 
     pub fn parse_err<T: Into<String>, M: ToString>(target: T, msg: M) -> Self {
-        ParseErr {
-            target: target.into(),
+        StdError::ParseErr {
+            target_type: target.into(),
             msg: msg.to_string(),
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
         }
-        .build()
     }
 
     pub fn serialize_err<S: Into<String>, M: ToString>(source: S, msg: M) -> Self {
-        SerializeErr {
-            source: source.into(),
+        StdError::SerializeErr {
+            source_type: source.into(),
             msg: msg.to_string(),
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
         }
-        .build()
     }
 
     pub fn underflow<U: ToString>(minuend: U, subtrahend: U) -> Self {
-        Underflow {
+        StdError::Underflow {
             minuend: minuend.to_string(),
             subtrahend: subtrahend.to_string(),
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
         }
-        .build()
     }
 
     #[deprecated(
@@ -123,7 +146,10 @@ impl StdError {
         note = "All StdError cases not required by the standard library will be removed in cosmwasm-std 0.12. Please migrate to custom errors instead of using StdError."
     )]
     pub fn unauthorized() -> Self {
-        Unauthorized {}.build()
+        StdError::Unauthorized {
+            #[cfg(feature = "backtraces")]
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
@@ -222,8 +248,10 @@ mod test {
     fn parse_err_works() {
         let error = StdError::parse_err("Book", "Missing field: title");
         match error {
-            StdError::ParseErr { target, msg, .. } => {
-                assert_eq!(target, "Book");
+            StdError::ParseErr {
+                target_type, msg, ..
+            } => {
+                assert_eq!(target_type, "Book");
                 assert_eq!(msg, "Missing field: title");
             }
             _ => panic!("expect different error"),
@@ -234,8 +262,10 @@ mod test {
     fn serialize_err_works() {
         let error = StdError::serialize_err("Book", "Content too long");
         match error {
-            StdError::SerializeErr { source, msg, .. } => {
-                assert_eq!(source, "Book");
+            StdError::SerializeErr {
+                source_type, msg, ..
+            } => {
+                assert_eq!(source_type, "Book");
                 assert_eq!(msg, "Content too long");
             }
             _ => panic!("expect different error"),
@@ -289,7 +319,7 @@ mod test {
         let embedded = format!("Debug message: {:?}", error);
         assert_eq!(
             embedded,
-            r#"Debug message: Underflow { minuend: "3", subtrahend: "5", backtrace: None }"#
+            r#"Debug message: Underflow { minuend: "3", subtrahend: "5" }"#
         );
     }
 

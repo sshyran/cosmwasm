@@ -147,6 +147,23 @@ major releases of `cosmwasm`. Note that you can also view the
   })
   ```
 
+- In your contract's `.cargo/config` remove `--features backtraces`, which is
+  now available in Rust nightly only:
+
+  ```diff
+  @@ -1,6 +1,6 @@
+   [alias]
+   wasm = "build --release --target wasm32-unknown-unknown"
+   wasm-debug = "build --target wasm32-unknown-unknown"
+  -unit-test = "test --lib --features backtraces"
+  +unit-test = "test --lib"
+   integration-test = "test --test integration"
+   schema = "run --example schema"
+  ```
+
+  In order to use backtraces for debugging, run
+  `RUST_BACKTRACE=1 cargo +nightly unit-test --features backtraces`.
+
 ## 0.9 -> 0.10
 
 Integration tests:

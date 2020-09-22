@@ -27,6 +27,11 @@
 - Deprecate `StdError::Unauthorized` and `StdError::unauthorized` in favour of
   custom errors. From now on `StdError` should only be created by the standard
   library and should only contain cases the standard library needs.
+- Use dependency `thiserror` instead of `snafu` to implement `StdError`. Along
+  with this change, the `backtraces` feature now requires Rust nightly.
+- Rename `StdError::ParseErr::source` to `StdError::ParseErr::source_type` and
+  `StdError::SerializeErr::target` to `StdError::SerializeErr::target_type` to
+  work around speacial treatment of the field name `source` in thiserror.
 
 **cosmwasm-vm**
 
