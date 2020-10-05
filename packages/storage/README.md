@@ -37,12 +37,6 @@ foos.set(b"one", b"foo");
 
 let mut bars = prefixed(b"bar", &mut store);
 bars.set(b"one", b"bar");
-
-let read_foo = prefixed_read(b"foo", &store);
-assert_eq!(b"foo".to_vec(), read_foo.get(b"one").unwrap());
-
-let read_bar = prefixed_read(b"bar", &store);
-assert_eq!(b"bar".to_vec(), read_bar.get(b"one").unwrap());
 ```
 
 Please note that only one mutable reference to the underlying store may be valid

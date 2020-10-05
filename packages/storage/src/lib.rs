@@ -8,10 +8,10 @@ mod transactions;
 mod type_helpers;
 mod typed;
 
-pub use bucket::{bucket, bucket_read, Bucket, ReadonlyBucket};
+pub use bucket::{bucket, Bucket};
 pub use length_prefixed::{to_length_prefixed, to_length_prefixed_nested};
-pub use prefixed_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
+pub use prefixed_storage::{prefixed, PrefixedStorage};
 pub use sequence::{currval, nextval, sequence};
-pub use singleton::{singleton, singleton_read, ReadonlySingleton, Singleton};
+pub use singleton::{singleton, Singleton};
 pub use transactions::{transactional, RepLog, StorageTransaction};
-pub use typed::{typed, typed_read, ReadonlyTypedStorage, TypedStorage};
+pub use typed::{typed, TypedStorage};

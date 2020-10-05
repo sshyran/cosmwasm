@@ -124,7 +124,7 @@ fn dequeue<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<QueryResponse> {
@@ -152,7 +152,7 @@ fn query_sum<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResul
 }
 
 fn query_reducer<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
 ) -> StdResult<ReducerResponse> {
     let mut out: Vec<(i32, i32)> = vec![];
     // val: StdResult<Item>
@@ -335,7 +335,7 @@ mod tests {
         .unwrap();
         assert_eq!(get_count(&deps), 4);
         assert_eq!(get_sum(&deps), 130);
-        let counters = query_reducer(&deps).unwrap().counters;
+        let counters = query_reducer(&mut deps).unwrap().counters;
         assert_eq!(counters, vec![(40, 85), (15, 125), (85, 0), (-10, 140)]);
     }
 

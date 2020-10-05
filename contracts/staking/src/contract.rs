@@ -9,8 +9,7 @@ use crate::msg::{
     TokenInfoResponse,
 };
 use crate::state::{
-    balances, balances_read, claims, claims_read, invest_info, invest_info_read, token_info,
-    token_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
+    balances, claims, invest_info, token_info, total_supply, InvestmentInfo, Supply,
 };
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
@@ -143,7 +142,7 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     // ensure we have the proper denom
-    let invest = invest_info_read(&deps.storage).load()?;
+    let invest = invest_info(&mut deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
     let payment = info
         .sent_funds
@@ -199,7 +198,7 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
-    let invest = invest_info_read(&deps.storage).load()?;
+    let invest = invest_info(&mut deps.storage).load()?;
     // ensure it is big enough to care
     if amount < invest.min_withdrawal {
         return Err(StdError::generic_err(format!(
@@ -267,7 +266,7 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
     info: MessageInfo,
 ) -> StdResult<HandleResponse> {
     // find how many tokens the contract has
-    let invest = invest_info_read(&deps.storage).load()?;
+    let invest = invest_info(&mut deps.storage).load()?;
     let mut balance = deps
         .querier
         .query_balance(&env.contract.address, &invest.bond_denom)?;
@@ -320,7 +319,7 @@ pub fn reinvest<S: Storage, A: Api, Q: Querier>(
     _info: MessageInfo,
 ) -> StdResult<HandleResponse> {
     let contract_addr = env.contract.address;
-    let invest = invest_info_read(&deps.storage).load()?;
+    let invest = invest_info(&mut deps.storage).load()?;
     let msg = to_binary(&HandleMsg::_BondAllTokens {})?;
 
     // and bond them to the validator
@@ -355,7 +354,7 @@ pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
     }
 
     // find how many tokens we have to bond
-    let invest = invest_info_read(&deps.storage).load()?;
+    let invest = invest_info(&mut deps.storage).load()?;
     let mut balance = deps
         .querier
         .query_balance(&env.contract.address, &invest.bond_denom)?;
@@ -389,7 +388,7 @@ pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -402,38 +401,38 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
 ) -> StdResult<TokenInfoResponse> {
-    token_info_read(&deps.storage).load()
+    token_info(&mut deps.storage).load()
 }
 
 pub fn query_balance<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     address: HumanAddr,
 ) -> StdResult<BalanceResponse> {
     let address_raw = deps.api.canonical_address(&address)?;
-    let balance = balances_read(&deps.storage)
+    let balance = balances(&mut deps.storage)
         .may_load(address_raw.as_slice())?
         .unwrap_or_default();
     Ok(BalanceResponse { balance })
 }
 
 pub fn query_claims<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     address: HumanAddr,
 ) -> StdResult<ClaimsResponse> {
     let address_raw = deps.api.canonical_address(&address)?;
-    let claims = claims_read(&deps.storage)
+    let claims = claims(&mut deps.storage)
         .may_load(address_raw.as_slice())?
         .unwrap_or_default();
     Ok(ClaimsResponse { claims })
 }
 
 pub fn query_investment<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
 ) -> StdResult<InvestmentResponse> {
-    let invest = invest_info_read(&deps.storage).load()?;
-    let supply = total_supply_read(&deps.storage).load()?;
+    let invest = invest_info(&mut deps.storage).load()?;
+    let supply = total_supply(&mut deps.storage).load()?;
 
     let res = InvestmentResponse {
         owner: deps.api.human_address(&invest.owner)?,
@@ -506,17 +505,17 @@ mod tests {
     }
 
     fn get_balance<S: Storage, A: Api, Q: Querier, U: Into<HumanAddr>>(
-        deps: &Extern<S, A, Q>,
+        deps: &mut Extern<S, A, Q>,
         addr: U,
     ) -> Uint128 {
-        query_balance(&deps, addr.into()).unwrap().balance
+        query_balance(deps, addr.into()).unwrap().balance
     }
 
     fn get_claims<S: Storage, A: Api, Q: Querier, U: Into<HumanAddr>>(
-        deps: &Extern<S, A, Q>,
+        deps: &mut Extern<S, A, Q>,
         addr: U,
     ) -> Uint128 {
-        query_claims(&deps, addr.into()).unwrap().claims
+        query_claims(deps, addr.into()).unwrap().claims
     }
 
     #[test]
@@ -575,18 +574,18 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // token info is proper
-        let token = query_token_info(&deps).unwrap();
+        let token = query_token_info(&mut deps).unwrap();
         assert_eq!(&token.name, &msg.name);
         assert_eq!(&token.symbol, &msg.symbol);
         assert_eq!(token.decimals, msg.decimals);
 
         // no balance
-        assert_eq!(get_balance(&deps, &creator), Uint128(0));
+        assert_eq!(get_balance(&mut deps, &creator), Uint128(0));
         // no claims
-        assert_eq!(get_claims(&deps, &creator), Uint128(0));
+        assert_eq!(get_claims(&mut deps, &creator), Uint128(0));
 
         // investment info correct
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(&mut deps).unwrap();
         assert_eq!(&invest.owner, &creator);
         assert_eq!(&invest.validator, &msg.validator);
         assert_eq!(invest.exit_tax, msg.exit_tax);
@@ -628,10 +627,10 @@ mod tests {
         }
 
         // bob got 1000 DRV for 1000 stake at a 1.0 ratio
-        assert_eq!(get_balance(&deps, &bob), Uint128(1000));
+        assert_eq!(get_balance(&mut deps, &bob), Uint128(1000));
 
         // investment info correct (updated supply)
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(&mut deps).unwrap();
         assert_eq!(invest.token_supply, Uint128(1000));
         assert_eq!(invest.staked_tokens, coin(1000, "ustake"));
         assert_eq!(invest.nominal_value, Decimal::one());
@@ -671,7 +670,7 @@ mod tests {
         set_delegation(&mut deps.querier, 1500, "ustake");
 
         // we should now see 1000 issues and 1500 bonded (and a price of 1.5)
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(&mut deps).unwrap();
         assert_eq!(invest.token_supply, Uint128(1000));
         assert_eq!(invest.staked_tokens, coin(1500, "ustake"));
         let ratio = Decimal::from_str("1.5").unwrap();
@@ -688,9 +687,9 @@ mod tests {
         set_delegation(&mut deps.querier, 3000, "ustake");
 
         // alice should have gotten 2000 DRV for the 3000 stake, keeping the ratio at 1.5
-        assert_eq!(get_balance(&deps, &alice), Uint128(2000));
+        assert_eq!(get_balance(&mut deps, &alice), Uint128(2000));
 
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(&mut deps).unwrap();
         assert_eq!(invest.token_supply, Uint128(3000));
         assert_eq!(invest.staked_tokens, coin(4500, "ustake"));
         assert_eq!(invest.nominal_value, ratio);
@@ -797,15 +796,15 @@ mod tests {
         set_delegation(&mut deps.querier, 690, "ustake");
 
         // check balances
-        assert_eq!(get_balance(&deps, &bob), bobs_balance);
-        assert_eq!(get_balance(&deps, &creator), owner_cut);
+        assert_eq!(get_balance(&mut deps, &bob), bobs_balance);
+        assert_eq!(get_balance(&mut deps, &creator), owner_cut);
         // proper claims
-        assert_eq!(get_claims(&deps, &bob), bobs_claim);
+        assert_eq!(get_claims(&mut deps, &bob), bobs_claim);
 
         // supplies updated, ratio the same (1.5)
         let ratio = Decimal::from_str("1.5").unwrap();
 
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(&mut deps).unwrap();
         assert_eq!(invest.token_supply, bobs_balance + owner_cut);
         assert_eq!(invest.staked_tokens, coin(690, "ustake")); // 1500 - 810
         assert_eq!(invest.nominal_value, ratio);

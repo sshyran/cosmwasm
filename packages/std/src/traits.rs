@@ -39,8 +39,7 @@ impl<S: Storage, A: Api, Q: Querier> Extern<S, A, Q> {
     }
 }
 
-/// ReadonlyStorage is access to the contracts persistent data store
-pub trait ReadonlyStorage {
+pub trait Storage {
     /// Returns None when key does not exist.
     /// Returns Some(Vec<u8>) when key exists.
     ///
@@ -60,11 +59,9 @@ pub trait ReadonlyStorage {
         end: Option<&[u8]>,
         order: Order,
     ) -> Box<dyn Iterator<Item = KV> + 'a>;
-}
 
-// Storage extends ReadonlyStorage to give mutable access
-pub trait Storage: ReadonlyStorage {
     fn set(&mut self, key: &[u8], value: &[u8]);
+
     /// Removes a database entry at `key`.
     ///
     /// The current interface does not allow to differentiate between a key that existed

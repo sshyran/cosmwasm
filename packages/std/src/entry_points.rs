@@ -32,7 +32,7 @@
 ///
 /// # type QueryMsg = ();
 /// pub fn query<S: Storage, A: Api, Q: Querier>(
-///     deps: &Extern<S, A, Q>,
+///     deps: &mut Extern<S, A, Q>,
 ///     env: Env,
 ///     msg: QueryMsg,
 /// ) -> QueryResult {

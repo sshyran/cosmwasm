@@ -1,8 +1,8 @@
+use cosmwasm_std::Storage;
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, KV};
-use cosmwasm_std::{ReadonlyStorage, Storage};
 
-pub(crate) fn get_with_prefix<S: ReadonlyStorage>(
+pub(crate) fn get_with_prefix<S: Storage>(
     storage: &S,
     namespace: &[u8],
     key: &[u8],
@@ -31,7 +31,7 @@ fn concat(namespace: &[u8], key: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(feature = "iterator")]
-pub(crate) fn range_with_prefix<'a, S: ReadonlyStorage>(
+pub(crate) fn range_with_prefix<'a, S: Storage>(
     storage: &'a S,
     namespace: &[u8],
     start: Option<&[u8]>,

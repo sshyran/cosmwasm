@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, ser::Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{to_vec, ReadonlyStorage, StdError, StdResult, Storage};
+use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, KV};
 
@@ -20,15 +20,6 @@ where
     T: Serialize + DeserializeOwned,
 {
     Bucket::new(storage, namespace)
-}
-
-/// An alias of ReadonlyBucket::new for less verbose usage
-pub fn bucket_read<'a, S, T>(storage: &'a S, namespace: &[u8]) -> ReadonlyBucket<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    ReadonlyBucket::new(storage, namespace)
 }
 
 pub struct Bucket<'a, S, T>
@@ -114,64 +105,6 @@ where
     }
 }
 
-pub struct ReadonlyBucket<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    storage: &'a S,
-    prefix: Vec<u8>,
-    // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
-    data: PhantomData<T>,
-}
-
-impl<'a, S, T> ReadonlyBucket<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    pub fn new(storage: &'a S, namespace: &[u8]) -> Self {
-        ReadonlyBucket {
-            storage,
-            prefix: to_length_prefixed(namespace),
-            data: PhantomData,
-        }
-    }
-
-    pub fn multilevel(storage: &'a S, namespaces: &[&[u8]]) -> Self {
-        ReadonlyBucket {
-            storage,
-            prefix: to_length_prefixed_nested(namespaces),
-            data: PhantomData,
-        }
-    }
-
-    /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load(&self, key: &[u8]) -> StdResult<T> {
-        let value = get_with_prefix(self.storage, &self.prefix, key);
-        must_deserialize(&value)
-    }
-
-    /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
-    /// returns an error on issues parsing
-    pub fn may_load(&self, key: &[u8]) -> StdResult<Option<T>> {
-        let value = get_with_prefix(self.storage, &self.prefix, key);
-        may_deserialize(&value)
-    }
-
-    #[cfg(feature = "iterator")]
-    pub fn range<'b>(
-        &'b self,
-        start: Option<&[u8]>,
-        end: Option<&[u8]>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'b> {
-        let mapped = range_with_prefix(self.storage, &self.prefix, start, end, order)
-            .map(deserialize_kv::<T>);
-        Box::new(mapped)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -225,29 +158,6 @@ mod test {
     }
 
     #[test]
-    fn readonly_works() {
-        let mut store = MockStorage::new();
-        let mut bucket = bucket::<_, Data>(&mut store, b"data");
-
-        // save data
-        let data = Data {
-            name: "Maria".to_string(),
-            age: 42,
-        };
-        bucket.save(b"maria", &data).unwrap();
-
-        let reader = bucket_read::<_, Data>(&mut store, b"data");
-
-        // check empty data handling
-        assert!(reader.load(b"john").is_err());
-        assert_eq!(reader.may_load(b"john").unwrap(), None);
-
-        // load it properly
-        let loaded = reader.load(b"maria").unwrap();
-        assert_eq!(data, loaded);
-    }
-
-    #[test]
     fn buckets_isolated() {
         let mut store = MockStorage::new();
         let mut bucket1 = bucket::<_, Data>(&mut store, b"data");
@@ -269,14 +179,14 @@ mod test {
         bucket2.save(b"amaria", &data2).unwrap();
 
         // load one
-        let reader = bucket_read::<_, Data>(&store, b"data");
+        let reader = bucket::<_, Data>(&mut store, b"data");
         let loaded = reader.load(b"maria").unwrap();
         assert_eq!(data, loaded);
         // no cross load
         assert_eq!(None, reader.may_load(b"amaria").unwrap());
 
         // load the other
-        let reader2 = bucket_read::<_, Data>(&store, b"dat");
+        let reader2 = bucket::<_, Data>(&mut store, b"dat");
         let loaded2 = reader2.load(b"amaria").unwrap();
         assert_eq!(data2, loaded2);
         // no cross load
@@ -433,7 +343,7 @@ mod test {
     #[cfg(feature = "iterator")]
     fn range_over_data() {
         let mut store = MockStorage::new();
-        let mut bucket = bucket::<_, Data>(&mut store, b"data");
+        let mut persons = bucket::<_, Data>(&mut store, b"data");
 
         let jose = Data {
             name: "Jose".to_string(),
@@ -444,20 +354,20 @@ mod test {
             age: 27,
         };
 
-        bucket.save(b"maria", &maria).unwrap();
-        bucket.save(b"jose", &jose).unwrap();
+        persons.save(b"maria", &maria).unwrap();
+        persons.save(b"jose", &jose).unwrap();
 
         let res_data: StdResult<Vec<KV<Data>>> =
-            bucket.range(None, None, Order::Ascending).collect();
+            persons.range(None, None, Order::Ascending).collect();
         let data = res_data.unwrap();
         assert_eq!(data.len(), 2);
         assert_eq!(data[0], (b"jose".to_vec(), jose.clone()));
         assert_eq!(data[1], (b"maria".to_vec(), maria.clone()));
 
-        // also works for readonly
-        let read_bucket = bucket_read::<_, Data>(&store, b"data");
+        // Can create a reader as well
+        let read_persons = bucket::<_, Data>(&mut store, b"data");
         let res_data: StdResult<Vec<KV<Data>>> =
-            read_bucket.range(None, None, Order::Ascending).collect();
+            read_persons.range(None, None, Order::Ascending).collect();
         let data = res_data.unwrap();
         assert_eq!(data.len(), 2);
         assert_eq!(data[0], (b"jose".to_vec(), jose));

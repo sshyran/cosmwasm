@@ -6,7 +6,7 @@ use std::ops::{Bound, RangeBounds};
 
 #[cfg(feature = "iterator")]
 use crate::iterator::{Order, KV};
-use crate::traits::{ReadonlyStorage, Storage};
+use crate::traits::Storage;
 
 #[derive(Default)]
 pub struct MemoryStorage {
@@ -19,7 +19,26 @@ impl MemoryStorage {
     }
 }
 
-impl ReadonlyStorage for MemoryStorage {
+#[cfg(feature = "iterator")]
+fn range_bounds(start: Option<&[u8]>, end: Option<&[u8]>) -> impl RangeBounds<Vec<u8>> {
+    (
+        start.map_or(Bound::Unbounded, |x| Bound::Included(x.to_vec())),
+        end.map_or(Bound::Unbounded, |x| Bound::Excluded(x.to_vec())),
+    )
+}
+
+#[cfg(feature = "iterator")]
+/// The BTreeMap specific key-value pair reference type, as returned by BTreeMap<Vec<u8>, T>::range.
+/// This is internal as it can change any time if the map implementation is swapped out.
+type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
+
+#[cfg(feature = "iterator")]
+fn clone_item<T: Clone>(item_ref: BTreeMapPairRef<T>) -> KV<T> {
+    let (key, value) = item_ref;
+    (key.clone(), value.clone())
+}
+
+impl Storage for MemoryStorage {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         self.data.get(key).cloned()
     }
@@ -50,28 +69,7 @@ impl ReadonlyStorage for MemoryStorage {
             Order::Descending => Box::new(iter.rev().map(clone_item)),
         }
     }
-}
 
-#[cfg(feature = "iterator")]
-fn range_bounds(start: Option<&[u8]>, end: Option<&[u8]>) -> impl RangeBounds<Vec<u8>> {
-    (
-        start.map_or(Bound::Unbounded, |x| Bound::Included(x.to_vec())),
-        end.map_or(Bound::Unbounded, |x| Bound::Excluded(x.to_vec())),
-    )
-}
-
-#[cfg(feature = "iterator")]
-/// The BTreeMap specific key-value pair reference type, as returned by BTreeMap<Vec<u8>, T>::range.
-/// This is internal as it can change any time if the map implementation is swapped out.
-type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
-
-#[cfg(feature = "iterator")]
-fn clone_item<T: Clone>(item_ref: BTreeMapPairRef<T>) -> KV<T> {
-    let (key, value) = item_ref;
-    (key.clone(), value.clone())
-}
-
-impl Storage for MemoryStorage {
     fn set(&mut self, key: &[u8], value: &[u8]) {
         self.data.insert(key.to_vec(), value.to_vec());
     }

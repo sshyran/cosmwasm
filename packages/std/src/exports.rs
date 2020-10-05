@@ -161,7 +161,7 @@ where
 /// - `E`: error type for responses
 pub fn do_query<M, E>(
     query_fn: &dyn Fn(
-        &Extern<ExternalStorage, ExternalApi, ExternalQuerier>,
+        &mut Extern<ExternalStorage, ExternalApi, ExternalQuerier>,
         Env,
         M,
     ) -> Result<QueryResponse, E>,
@@ -263,7 +263,7 @@ where
 
 fn _do_query<M, E>(
     query_fn: &dyn Fn(
-        &Extern<ExternalStorage, ExternalApi, ExternalQuerier>,
+        &mut Extern<ExternalStorage, ExternalApi, ExternalQuerier>,
         Env,
         M,
     ) -> Result<QueryResponse, E>,
@@ -280,8 +280,8 @@ where
     let env: Env = try_into_contract_result!(from_slice(&env));
     let msg: M = try_into_contract_result!(from_slice(&msg));
 
-    let deps = make_dependencies();
-    query_fn(&deps, env, msg).into()
+    let mut deps = make_dependencies();
+    query_fn(&mut deps, env, msg).into()
 }
 
 /// Makes all bridges to external dependencies (i.e. Wasm imports) that are injected by the VM

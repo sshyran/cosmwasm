@@ -62,7 +62,7 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
-    _deps: &Extern<S, A, Q>,
+    _deps: &mut Extern<S, A, Q>,
     _env: Env,
     _msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -75,7 +75,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, HumanAddr, ReadonlyStorage, StdError};
+    use cosmwasm_std::{coins, HumanAddr, StdError};
 
     #[test]
     fn init_fails() {

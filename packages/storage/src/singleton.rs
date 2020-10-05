@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, ser::Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{to_vec, ReadonlyStorage, StdError, StdResult, Storage};
+use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
 
 use crate::length_prefixed::to_length_prefixed;
 use crate::type_helpers::{may_deserialize, must_deserialize};
@@ -13,15 +13,6 @@ where
     T: Serialize + DeserializeOwned,
 {
     Singleton::new(storage, key)
-}
-
-/// An alias of ReadonlySingleton::new for less verbose usage
-pub fn singleton_read<'a, S, T>(storage: &'a S, key: &[u8]) -> ReadonlySingleton<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    ReadonlySingleton::new(storage, key)
 }
 
 /// Singleton effectively combines PrefixedStorage with TypedStorage to
@@ -91,46 +82,6 @@ where
     }
 }
 
-/// ReadonlySingleton only requires a ReadonlyStorage and exposes only the
-/// methods of Singleton that don't modify state.
-pub struct ReadonlySingleton<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    storage: &'a S,
-    key: Vec<u8>,
-    // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
-    data: PhantomData<T>,
-}
-
-impl<'a, S, T> ReadonlySingleton<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    pub fn new(storage: &'a S, key: &[u8]) -> Self {
-        ReadonlySingleton {
-            storage,
-            key: to_length_prefixed(key),
-            data: PhantomData,
-        }
-    }
-
-    /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load(&self) -> StdResult<T> {
-        let value = self.storage.get(&self.key);
-        must_deserialize(&value)
-    }
-
-    /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
-    /// returns an error on issues parsing
-    pub fn may_load(&self) -> StdResult<Option<T>> {
-        let value = self.storage.get(&self.key);
-        may_deserialize(&value)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -195,10 +146,10 @@ mod test {
         };
         writer.save(&cfg).unwrap();
 
-        let reader = singleton_read::<_, Config>(&store, b"config");
+        let reader = singleton::<_, Config>(&mut store, b"config");
         assert_eq!(cfg, reader.load().unwrap());
 
-        let other_reader = singleton_read::<_, Config>(&store, b"config2");
+        let other_reader = singleton::<_, Config>(&mut store, b"config2");
         assert_eq!(other_reader.may_load().unwrap(), None);
     }
 

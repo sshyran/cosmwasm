@@ -9,7 +9,7 @@ use crate::msg::{
     CapitalizedResponse, ChainResponse, CustomMsg, HandleMsg, InitMsg, OwnerResponse, QueryMsg,
     SpecialQuery, SpecialResponse,
 };
-use crate::state::{config, config_read, State};
+use crate::state::{config, State};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -89,7 +89,7 @@ pub fn try_change_owner<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -100,8 +100,10 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn query_owner<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<OwnerResponse> {
-    let state = config_read(&deps.storage).load()?;
+fn query_owner<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+) -> StdResult<OwnerResponse> {
+    let state = config(&mut deps.storage).load()?;
     let resp = OwnerResponse {
         owner: deps.api.human_address(&state.owner)?,
     };
@@ -109,7 +111,7 @@ fn query_owner<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdRes
 }
 
 fn query_capitalized<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     text: String,
 ) -> StdResult<CapitalizedResponse> {
     let req = SpecialQuery::Capitalized { text }.into();
@@ -118,7 +120,7 @@ fn query_capitalized<S: Storage, A: Api, Q: Querier>(
 }
 
 fn query_chain<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     request: &QueryRequest<SpecialQuery>,
 ) -> StdResult<ChainResponse> {
     let raw = to_vec(request).map_err(|serialize_err| {
@@ -159,7 +161,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let value = query_owner(&deps).unwrap();
+        let value = query_owner(&mut deps).unwrap();
         assert_eq!("creator", value.owner.as_str());
     }
 
@@ -284,7 +286,7 @@ mod tests {
 
         // should change state
         assert_eq!(0, res.messages.len());
-        let value = query_owner(&deps).unwrap();
+        let value = query_owner(&mut deps).unwrap();
         assert_eq!("friend", value.owner.as_str());
     }
 
@@ -338,19 +340,19 @@ mod tests {
 
     #[test]
     fn capitalized_query_works() {
-        let deps = mock_dependencies_with_custom_querier(&[]);
+        let mut deps = mock_dependencies_with_custom_querier(&[]);
 
         let msg = QueryMsg::Capitalized {
             text: "demo one".to_string(),
         };
-        let response = query(&deps, mock_env(), msg).unwrap();
+        let response = query(&mut deps, mock_env(), msg).unwrap();
         let value: CapitalizedResponse = from_binary(&response).unwrap();
         assert_eq!(value.text, "DEMO ONE");
     }
 
     #[test]
     fn chain_query_works() {
-        let deps = mock_dependencies_with_custom_querier(&coins(123, "ucosm"));
+        let mut deps = mock_dependencies_with_custom_querier(&coins(123, "ucosm"));
 
         // with bank query
         let msg = QueryMsg::Chain {
@@ -359,7 +361,7 @@ mod tests {
             }
             .into(),
         };
-        let response = query(&deps, mock_env(), msg).unwrap();
+        let response = query(&mut deps, mock_env(), msg).unwrap();
         let outer: ChainResponse = from_binary(&response).unwrap();
         let inner: AllBalanceResponse = from_binary(&outer.data).unwrap();
         assert_eq!(inner.amount, coins(123, "ucosm"));
@@ -368,7 +370,7 @@ mod tests {
         let msg = QueryMsg::Chain {
             request: SpecialQuery::Ping {}.into(),
         };
-        let response = query(&deps, mock_env(), msg).unwrap();
+        let response = query(&mut deps, mock_env(), msg).unwrap();
         let outer: ChainResponse = from_binary(&response).unwrap();
         let inner: SpecialResponse = from_binary(&outer.data).unwrap();
         assert_eq!(inner.msg, "pong");

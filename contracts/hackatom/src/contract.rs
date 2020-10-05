@@ -295,7 +295,7 @@ fn do_user_errors_in_api_calls<A: Api>(api: &A) -> Result<HandleResponse, HackEr
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: QueryMsg,
 ) -> StdResult<QueryResponse> {
@@ -309,7 +309,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 }
 
 fn query_verifier<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
 ) -> StdResult<VerifierResponse> {
     let data = deps
         .storage
@@ -321,7 +321,7 @@ fn query_verifier<S: Storage, A: Api, Q: Querier>(
 }
 
 fn query_other_balance<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     address: HumanAddr,
 ) -> StdResult<AllBalanceResponse> {
     let amount = deps.querier.query_all_balances(address)?;
@@ -329,7 +329,7 @@ fn query_other_balance<S: Storage, A: Api, Q: Querier>(
 }
 
 fn query_recurse<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     depth: u32,
     work: u32,
     contract: HumanAddr,
@@ -365,8 +365,7 @@ mod tests {
     use cosmwasm_std::testing::{
         mock_dependencies, mock_dependencies_with_balances, mock_env, mock_info, MOCK_CONTRACT_ADDR,
     };
-    // import trait ReadonlyStorage to get access to read
-    use cosmwasm_std::{attr, coins, ReadonlyStorage};
+    use cosmwasm_std::{attr, coins};
 
     #[test]
     fn proper_initialization() {
@@ -414,7 +413,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // now let's query
-        let query_response = query_verifier(&deps).unwrap();
+        let query_response = query_verifier(&mut deps).unwrap();
         assert_eq!(query_response.verifier, verifier);
     }
 
@@ -434,7 +433,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // check it is 'verifies'
-        let query_response = query(&deps, mock_env(), QueryMsg::Verifier {}).unwrap();
+        let query_response = query(&mut deps, mock_env(), QueryMsg::Verifier {}).unwrap();
         assert_eq!(query_response.as_slice(), b"{\"verifier\":\"verifies\"}");
 
         // change the verifier via migrate
@@ -447,7 +446,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // check it is 'someone else'
-        let query_response = query_verifier(&deps).unwrap();
+        let query_response = query_verifier(&mut deps).unwrap();
         assert_eq!(query_response.verifier, new_verifier);
     }
 
@@ -455,14 +454,14 @@ mod tests {
     fn querier_callbacks_work() {
         let rich_addr = HumanAddr::from("foobar");
         let rich_balance = coins(10000, "gold");
-        let deps = mock_dependencies_with_balances(&[(&rich_addr, &rich_balance)]);
+        let mut deps = mock_dependencies_with_balances(&[(&rich_addr, &rich_balance)]);
 
         // querying with balance gets the balance
-        let bal = query_other_balance(&deps, rich_addr).unwrap();
+        let bal = query_other_balance(&mut deps, rich_addr).unwrap();
         assert_eq!(bal.amount, rich_balance);
 
         // querying other accounts gets none
-        let bal = query_other_balance(&deps, HumanAddr::from("someone else")).unwrap();
+        let bal = query_other_balance(&mut deps, HumanAddr::from("someone else")).unwrap();
         assert_eq!(bal.amount, vec![]);
     }
 
@@ -600,12 +599,12 @@ mod tests {
         // the test framework doesn't handle contracts querying contracts yet,
         // let's just make sure the last step looks right
 
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
         let contract = HumanAddr::from("my-contract");
         let bin_contract: &[u8] = b"my-contract";
 
         // return the unhashed value here
-        let no_work_query = query_recurse(&deps, 0, 0, contract.clone()).unwrap();
+        let no_work_query = query_recurse(&mut deps, 0, 0, contract.clone()).unwrap();
         assert_eq!(no_work_query.hashed, Binary::from(bin_contract));
 
         // let's see if 5 hashes are done right
@@ -613,7 +612,7 @@ mod tests {
         for _ in 0..4 {
             expected_hash = Sha256::digest(&expected_hash);
         }
-        let work_query = query_recurse(&deps, 0, 5, contract).unwrap();
+        let work_query = query_recurse(&mut deps, 0, 5, contract).unwrap();
         assert_eq!(work_query.hashed, expected_hash.to_vec().into());
     }
 }

@@ -1,11 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, ReadonlyStorage, Storage, Uint128};
-use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
-    Singleton,
-};
+use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, Storage, Uint128};
+use cosmwasm_storage::{bucket, singleton, Bucket, Singleton};
 
 use crate::msg::TokenInfoResponse;
 
@@ -21,17 +18,9 @@ pub fn balances<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
     bucket(storage, PREFIX_BALANCE)
 }
 
-pub fn balances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
-    bucket_read(storage, PREFIX_BALANCE)
-}
-
 /// claims are the claims to money being unbonded
 pub fn claims<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
     bucket(storage, PREFIX_CLAIMS)
-}
-
-pub fn claims_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
-    bucket_read(storage, PREFIX_CLAIMS)
 }
 
 /// Investment info is fixed at initialization, and is used to control the function of the contract
@@ -66,22 +55,10 @@ pub fn invest_info<S: Storage>(storage: &mut S) -> Singleton<S, InvestmentInfo> 
     singleton(storage, KEY_INVESTMENT)
 }
 
-pub fn invest_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, InvestmentInfo> {
-    singleton_read(storage, KEY_INVESTMENT)
-}
-
 pub fn token_info<S: Storage>(storage: &mut S) -> Singleton<S, TokenInfoResponse> {
     singleton(storage, KEY_TOKEN_INFO)
 }
 
-pub fn token_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, TokenInfoResponse> {
-    singleton_read(storage, KEY_TOKEN_INFO)
-}
-
 pub fn total_supply<S: Storage>(storage: &mut S) -> Singleton<S, Supply> {
     singleton(storage, KEY_TOTAL_SUPPLY)
-}
-
-pub fn total_supply_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, Supply> {
-    singleton_read(storage, KEY_TOTAL_SUPPLY)
 }

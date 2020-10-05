@@ -34,7 +34,7 @@ pub use crate::results::{
 };
 pub use crate::serde::{from_binary, from_slice, to_binary, to_vec};
 pub use crate::storage::MemoryStorage;
-pub use crate::traits::{Api, Extern, Querier, QuerierResult, ReadonlyStorage, Storage};
+pub use crate::traits::{Api, Extern, Querier, QuerierResult, Storage};
 pub use crate::types::{BlockInfo, ContractInfo, Empty, Env, MessageInfo};
 
 // Exposed in wasm build only

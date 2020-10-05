@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, ser::Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{to_vec, ReadonlyStorage, StdResult, Storage};
+use cosmwasm_std::{to_vec, StdResult, Storage};
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, KV};
 
@@ -16,15 +16,6 @@ where
     T: Serialize + DeserializeOwned,
 {
     TypedStorage::new(storage)
-}
-
-/// An alias of ReadonlyTypedStorage::new for less verbose usage
-pub fn typed_read<S, T>(storage: &S) -> ReadonlyTypedStorage<S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    ReadonlyTypedStorage::new(storage)
 }
 
 pub struct TypedStorage<'a, S, T>
@@ -97,56 +88,6 @@ where
     }
 }
 
-pub struct ReadonlyTypedStorage<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    storage: &'a S,
-    // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
-    data: PhantomData<T>,
-}
-
-impl<'a, S, T> ReadonlyTypedStorage<'a, S, T>
-where
-    S: ReadonlyStorage,
-    T: Serialize + DeserializeOwned,
-{
-    pub fn new(storage: &'a S) -> Self {
-        ReadonlyTypedStorage {
-            storage,
-            data: PhantomData,
-        }
-    }
-
-    /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load(&self, key: &[u8]) -> StdResult<T> {
-        let value = self.storage.get(key);
-        must_deserialize(&value)
-    }
-
-    /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
-    /// returns an error on issues parsing
-    pub fn may_load(&self, key: &[u8]) -> StdResult<Option<T>> {
-        let value = self.storage.get(key);
-        may_deserialize(&value)
-    }
-
-    #[cfg(feature = "iterator")]
-    pub fn range<'b>(
-        &'b self,
-        start: Option<&[u8]>,
-        end: Option<&[u8]>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'b> {
-        let mapped = self
-            .storage
-            .range(start, end, order)
-            .map(deserialize_kv::<T>);
-        Box::new(mapped)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -213,7 +154,7 @@ mod test {
         };
         bucket.save(b"maria", &data).unwrap();
 
-        let reader = typed_read::<_, Data>(&mut store);
+        let reader = typed::<_, Data>(&mut store);
 
         // check empty data handling
         assert!(reader.load(b"john").is_err());
@@ -327,7 +268,7 @@ mod test {
         assert_eq!(data[1], (b"maria".to_vec(), maria.clone()));
 
         // also works for readonly
-        let read_bucket = typed_read::<_, Data>(&store);
+        let read_bucket = typed::<_, Data>(&mut store);
         let res_data: StdResult<Vec<KV<Data>>> =
             read_bucket.range(None, None, Order::Ascending).collect();
         let data = res_data.unwrap();

@@ -202,7 +202,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse, ContractError> { }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> { }
